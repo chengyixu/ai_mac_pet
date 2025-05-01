@@ -3,6 +3,8 @@ import base64
 import subprocess
 import os
 import time
+import glob
+import datetime
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 from PIL import Image # Requires Pillow library: pip install Pillow
 import io
@@ -15,24 +17,97 @@ client = OpenAI(
     base_url=config.API_BASE_URL,
 )
 
-def capture_screenshot() -> str | None:
-    """Captures the main screen and saves it to the path in config."""
-    print("DEBUG: Attempting screenshot capture...")
+def ensure_screenshot_directory():
+    """Ensures the screenshot directory exists."""
+    if not os.path.exists(config.SCREENSHOT_DIRECTORY):
+        try:
+            os.makedirs(config.SCREENSHOT_DIRECTORY)
+            print(f"DEBUG: Created screenshot directory: {config.SCREENSHOT_DIRECTORY}")
+        except OSError as e:
+            print(f"ERROR: Could not create screenshot directory: {e}")
+            return False
+    return True
+
+def clean_old_screenshots():
+    """Keeps only the most recent MAX_SAVED_SCREENSHOTS screenshots."""
+    if not ensure_screenshot_directory():
+        return
+        
     try:
+        # Get all screenshot files in the directory
+        screenshot_pattern = os.path.join(config.SCREENSHOT_DIRECTORY, "cat_screenshot_*.png")
+        screenshot_files = glob.glob(screenshot_pattern)
+        
+        # Sort by modification time (newest last)
+        screenshot_files.sort(key=os.path.getmtime)
+        
+        # If we have more than our limit, delete the oldest ones
+        if len(screenshot_files) > config.MAX_SAVED_SCREENSHOTS:
+            files_to_delete = screenshot_files[:-config.MAX_SAVED_SCREENSHOTS]
+            
+            for file_path in files_to_delete:
+                try:
+                    os.remove(file_path)
+                    print(f"DEBUG: Deleted old screenshot: {file_path}")
+                except OSError as e:
+                    print(f"WARNING: Failed to delete old screenshot {file_path}: {e}")
+                    
+            print(f"DEBUG: Kept {config.MAX_SAVED_SCREENSHOTS} most recent screenshots")
+        else:
+            print(f"DEBUG: Only {len(screenshot_files)} screenshots stored, below limit of {config.MAX_SAVED_SCREENSHOTS}")
+    except Exception as e:
+        print(f"ERROR: Failed to clean old screenshots: {e}")
+
+def get_timestamp_filename():
+    """Generates a timestamped filename for the screenshot."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return config.SCREENSHOT_FILENAME_FORMAT.format(timestamp=timestamp)
+
+def capture_screenshot() -> str | None:
+    """
+    Captures the main screen and saves it to a timestamped file path.
+    Returns the path to the saved screenshot or None if failed.
+    """
+    print("DEBUG: Attempting screenshot capture...")
+    
+    # For the analysis process, we still use the temp screenshot path
+    screenshot_path = config.SCREENSHOT_PATH
+    
+    try:
+        # Ensure the screenshot directory exists
+        if not ensure_screenshot_directory():
+            return None
+            
         # Using /tmp/, usually writable without special permissions
-        command = ['screencapture', '-x', config.SCREENSHOT_PATH]
+        command = ['screencapture', '-x', screenshot_path]
         print(f"DEBUG: Running command: {' '.join(command)}")
         # Run the command. check=True raises CalledProcessError on non-zero exit.
         subprocess.run(command, check=True, timeout=10) # 10 second timeout
-        print(f"DEBUG: Screenshot supposedly saved to {config.SCREENSHOT_PATH}")
+        print(f"DEBUG: Screenshot saved to {screenshot_path}")
+        
         # Verify file exists immediately after command returns
-        if os.path.exists(config.SCREENSHOT_PATH):
-             print("DEBUG: Screenshot file verified.")
-             return config.SCREENSHOT_PATH
+        if os.path.exists(screenshot_path):
+            print("DEBUG: Screenshot file verified.")
+            
+            # For permanent storage, save a copy with timestamp to the storage directory
+            timestamp_filename = get_timestamp_filename()
+            permanent_path = os.path.join(config.SCREENSHOT_DIRECTORY, timestamp_filename)
+            
+            try:
+                # Copy the file to permanent storage
+                Image.open(screenshot_path).save(permanent_path)
+                print(f"DEBUG: Saved permanent copy to {permanent_path}")
+                
+                # Clean up old screenshots if we have too many
+                clean_old_screenshots()
+            except Exception as e:
+                print(f"WARNING: Failed to save permanent copy: {e}")
+            
+            return screenshot_path
         else:
-             # This case is unlikely if check=True didn't raise error, but good sanity check
-             print("ERROR: Screenshot command ran but file not found immediately after!")
-             return None
+            # This case is unlikely if check=True didn't raise error, but good sanity check
+            print("ERROR: Screenshot command ran but file not found immediately after!")
+            return None
     except FileNotFoundError:
         # Handle case where screencapture command itself isn't found
         print(f"ERROR: 'screencapture' command not found. Is this macOS and is it in the PATH?")
@@ -48,8 +123,6 @@ def capture_screenshot() -> str | None:
     except Exception as e:
         # Catch any other unexpected exceptions
         print(f"ERROR: Unexpected error during screenshot capture: {e}")
-        # import traceback # Uncomment for detailed traceback during debugging
-        # traceback.print_exc() # Uncomment for detailed traceback during debugging
         return None
 
 def encode_image_to_base64(image_path: str) -> str | None:
@@ -71,8 +144,6 @@ def encode_image_to_base64(image_path: str) -> str | None:
         return None
     except Exception as e:
         print(f"ERROR: Encoding failed - {e}")
-        # import traceback # Uncomment for detailed traceback during debugging
-        # traceback.print_exc() # Uncomment for detailed traceback during debugging
         return None
 
 def compress_image(image_path: str, max_size=(1920, 1920)): # Default max dimensions
@@ -102,8 +173,6 @@ def compress_image(image_path: str, max_size=(1920, 1920)): # Default max dimens
         # Log a warning if compression/resize fails, but allow the process to continue.
         # The original (potentially large) image will be used if this fails.
         print(f"WARNING: Could not compress/resize image {image_path}: {e}")
-        # import traceback # Uncomment for detailed traceback during debugging
-        # traceback.print_exc() # Uncomment for detailed traceback during debugging
 
 
 def analyze_screenshot_with_qwen(image_path: str) -> str:
@@ -168,9 +237,6 @@ def analyze_screenshot_with_qwen(image_path: str) -> str:
         end_time = time.time()
         print(f"DEBUG: Qwen response received in {end_time - start_time:.2f} seconds.")
 
-        # Debug Raw Response (Optional)
-        # print(f"DEBUG: API Raw Response: {completion.model_dump_json()}")
-
         # --- Process Response ---
         if completion.choices and completion.choices[0].message and completion.choices[0].message.content:
              analysis_result_text = completion.choices[0].message.content.strip()
@@ -212,12 +278,10 @@ def analyze_screenshot_with_qwen(image_path: str) -> str:
 
     except Exception as e: # Catch any other unexpected exceptions (network, library bugs, etc.)
          print(f"ERROR: Unexpected error during API call: {e}")
-         # import traceback # Uncomment for detailed traceback during debugging
-         # traceback.print_exc() # Uncomment for detailed traceback during debugging
          analysis_result_text = "喵？！发生了一些奇怪的事情..."
 
     # --- File Cleanup (runs regardless of API success/failure) ---
-    if os.path.exists(image_path):
+    if os.path.exists(image_path) and image_path == config.SCREENSHOT_PATH:
         try:
             os.remove(image_path)
             print(f"DEBUG: Temporary screenshot {image_path} deleted after analysis attempt.")

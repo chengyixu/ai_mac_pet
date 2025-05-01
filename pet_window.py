@@ -105,6 +105,8 @@ class PetWindow(QWidget):
     analysis_received = pyqtSignal(str)
     # Signal emitted when the cat is clicked (and not busy)
     cat_clicked_request_analysis = pyqtSignal()
+    # New signal for automatic analysis
+    auto_screenshot_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -118,6 +120,20 @@ class PetWindow(QWidget):
 
         # Connect the signal to the slot (method)
         self.analysis_received.connect(self.display_analysis_result)
+        
+        # Connect auto screenshot signal to the same handler as click
+        self.auto_screenshot_requested.connect(self.start_auto_analysis)
+        
+        # Setup timer for automatic screenshots if enabled
+        if config.AUTO_SCREENSHOT_ENABLED:
+            self.auto_screenshot_timer = QTimer(self)
+            self.auto_screenshot_timer.timeout.connect(self.request_auto_screenshot)
+            # Start the timer (convert seconds to milliseconds)
+            self.auto_screenshot_timer.start(config.AUTO_SCREENSHOT_INTERVAL_SECONDS * 1000)
+            print(f"DEBUG: Auto screenshot timer started with interval {config.AUTO_SCREENSHOT_INTERVAL_SECONDS} seconds")
+        else:
+            print("DEBUG: Auto screenshot feature is disabled in config")
+            
         print("DEBUG: PetWindow __init__ finished.")
 
     def initUI(self):
@@ -177,6 +193,26 @@ class PetWindow(QWidget):
             
         self.show()
         print("DEBUG: PetWindow shown.")
+    
+    def request_auto_screenshot(self):
+        """Called by the timer to request an automatic screenshot and analysis."""
+        if not self.analysis_in_progress:
+            print("DEBUG: Auto screenshot timer triggered")
+            self.auto_screenshot_requested.emit()
+        else:
+            print("DEBUG: Auto screenshot timer triggered but analysis already in progress, skipping")
+    
+    def start_auto_analysis(self):
+        """Handler for automatic screenshot requests."""
+        if not self.analysis_in_progress:
+            print("DEBUG: Starting automatic analysis...")
+            self.analysis_in_progress = True
+            self._update_cat_state("thinking")  # Show thinking state
+            
+            # Start the analysis in a separate thread (same as click-triggered analysis)
+            self.cat_clicked_request_analysis.emit()  # Reuse the existing signal/slot
+        else:
+            print("DEBUG: Analysis already in progress, skipping auto request")
 
     def _apply_macos_settings(self):
         """Apply minimal non-intrusive macOS settings"""
@@ -280,6 +316,11 @@ class PetWindow(QWidget):
     def closeEvent(self, event):
         """Ensure speech bubble is also closed/cleaned up."""
         print("DEBUG: PetWindow closeEvent.")
+        # Stop the auto screenshot timer if it exists
+        if hasattr(self, 'auto_screenshot_timer'):
+            self.auto_screenshot_timer.stop()
+            print("DEBUG: Auto screenshot timer stopped")
+            
         self.speech_bubble.hide()
         self.speech_bubble.deleteLater() # Schedule bubble for deletion
         event.accept()

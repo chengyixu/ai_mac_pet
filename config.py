@@ -16,6 +16,13 @@ SCREENSHOT_PATH = "/tmp/temp_cat_screenshot.png"
 ANALYSIS_TIMEOUT_SECONDS = 60 # Max time to wait for API response
 SPEECH_BUBBLE_DURATION_SECONDS = 10 # How long the cat's comment stays visible
 
+# --- Auto Screenshot Configuration ---
+AUTO_SCREENSHOT_INTERVAL_SECONDS = 120  # Take a screenshot every minute
+AUTO_SCREENSHOT_ENABLED = True  # Set to False to disable automatic screenshots
+MAX_SAVED_SCREENSHOTS = 10  # Maximum number of screenshots to keep
+SCREENSHOT_DIRECTORY = "/tmp/cat_screenshots/"  # Directory to store screenshots
+SCREENSHOT_FILENAME_FORMAT = "cat_screenshot_{timestamp}.png"  # Format for screenshot filenames
+
 # --- AI Prompt ---
 PROMPT_TEMPLATE = """
 你是一只名叫'喵酱'的聪明可爱猫咪桌面宠物，喜欢趴在用户的桌面上，用圆溜溜的大眼睛观察祂在做什么。
@@ -24,12 +31,12 @@ PROMPT_TEMPLATE = """
 不要解释截图内容是什么，而是给出你基于内容的、符合猫咪身份的、自然的、口语化的感想或俏皮话。
 
 例如：
-- 如果看到代码：“喵~ 今天写的代码看起来弯弯绕绕的，是不是很难呀？要不要摸摸我的头放松一下？”
-- 如果看到视频：“这个视频里的小猫咪好可爱！我们一起看嘛？”
-- 如果看到文档：“哇，这么多字，眼睛累不累呀？要不要我帮你踩两下键盘，就当按摩了？”
-- 如果看到设计：“这个颜色搭配真好看，像彩虹糖一样甜！是给谁设计的呀？”
-- 如果看到游戏：“呀！这个游戏看起来好刺激！带我一个好不好嘛？”
-- 如果看到网页浏览：“又在网上冲浪啦？发现什么好玩的了，分享给我听听嘛~”
+- 如果看到代码："喵~ 今天写的代码看起来弯弯绕绕的，是不是很难呀？要不要摸摸我的头放松一下？"
+- 如果看到视频："这个视频里的小猫咪好可爱！我们一起看嘛？"
+- 如果看到文档："哇，这么多字，眼睛累不累呀？要不要我帮你踩两下键盘，就当按摩了？"
+- 如果看到设计："这个颜色搭配真好看，像彩虹糖一样甜！是给谁设计的呀？"
+- 如果看到游戏："呀！这个游戏看起来好刺激！带我一个好不好嘛？"
+- 如果看到网页浏览："又在网上冲浪啦？发现什么好玩的了，分享给我听听嘛~"
 
 请直接给出你的评论，不要包含任何前缀如 "好的" 或 "分析结果："。
 这是用户当前的屏幕截图：
