@@ -1,22 +1,54 @@
-# 🐱 AI Mac Pet - Intelligent Desktop Cat Companion
-# 🐱 AI Mac 宠物 - 智能桌面猫咪伴侣
+# AI Mac Pet 🐱 - Your Smart Desktop Companion
 
-![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg?style=for-the-badge&logo=python&logoColor=white)
-![PyQt6](https://img.shields.io/badge/PyQt6-41CD52?style=for-the-badge&logo=qt&logoColor=white)
+A charming macOS desktop pet application featuring an adorable cat that sits on your desktop, periodically analyzes your screen activity, and provides cute, friendly comments in Chinese using AI technology.
 
----
+## 📝 Changelog
 
-## 🌏 Language / 语言
+- **2024-06-09**: Fixed a bug where the statistics window could crash if there was no activity data. The statistics output now always includes `recent_activities`, ensuring robust operation even when no activities have been recorded yet.
 
-- [English](#english-version)
-- [简体中文](#简体中文版本)
+## ✨ Features
 
----
+- 🐾 **Adorable Desktop Pet**: A cute cat that stays on top of your desktop
+- 🖼️ **Smart Screen Analysis**: Automatically captures and analyzes your screen every 2 minutes
+- 🤖 **AI-Powered Comments**: Uses Qwen-VL model to understand what you're doing and respond naturally
+- 💬 **Friendly Personality**: Your cat companion comments like a caring friend or partner
+- 🖱️ **Interactive**: Click the cat for instant analysis or drag to move around
+- ⏰ **Auto Screenshot**: Takes periodic screenshots to check on your activities
+- 📁 **Screenshot History**: Keeps recent screenshots for reference
 
-## English Version
+### 🆕 New Features (Inspired by Grok AI's Ani)
 
-A charming macOS desktop pet application featuring an adorable cat that sits on your desktop, periodically analyzes your screen activity, and provides cute, friendly commentary in Chinese using AI technology.
+- ❤️ **Favorability System**: Build a relationship with your cat companion
+  - Tracks interactions and adjusts personality based on your activities
+  - 6 relationship levels from "冷淡疏离" (Cold) to "灵魂伴侣" (Soulmate)
+  - Visual heart indicator showing current relationship status
+  
+- 🎭 **Dynamic Personality**: 
+  - Rich character backstory and preferences
+  - Jealous reactions when you look at other cats
+  - Time-aware responses (worried at late night, energetic in evening)
+  - Special reactions for different activities (coding, gaming, chatting)
+  
+- 💝 **Emotional Responses**:
+  - Shows affection, jealousy, concern, and playfulness
+  - Uses emoticons and internet slang naturally
+  - Personality changes based on favorability level
+  
+- 🕐 **Context-Aware AI**:
+  - Different responses based on time of day
+  - Special messages for weekends and holidays
+  - Remembers interaction patterns
+
+- 📊 **Activity Tracking System** (New!):
+  - Automatically categorizes your activities into 10 categories
+  - Tracks work, entertainment, social, learning, and more
+  - **Right-click the cat to view accumulated statistics (now robust to empty data!)**
+  - Visual progress bars showing activity distribution
+  - Persistent tracking that accumulates over time
+
+## 🚀 Installation
+
+A charming macOS desktop pet application featuring an adorable cat that sits on your desktop, periodically analyzes your screen activity, and provides cute, friendly comments in Chinese using AI technology.
 
 ### ✨ Features
 
@@ -78,7 +110,8 @@ python main.py
 ### 🎮 Usage
 
 #### Basic Interaction
-- **Click the cat**: Triggers immediate screen analysis
+- **Left-click the cat**: Triggers immediate screen analysis
+- **Right-click the cat**: Opens activity statistics window
 - **Drag the cat**: Move it anywhere on your desktop
 - **Close window**: Quit the application
 
@@ -116,6 +149,30 @@ SPEECH_BUBBLE_DURATION_SECONDS = 10  # How long messages stay visible
 MAX_SAVED_SCREENSHOTS = 10  # Number of screenshots to keep
 ```
 
+### 💕 Favorability System
+
+The cat tracks your interactions and builds a relationship with you:
+
+**How to Increase Favorability:**
+- 🛍️ Search for "cat food" or "cat toys" (+5 points)
+- 🎬 Watch anime together (+3 points)  
+- 💻 Work together (+1 point)
+- 🎮 Play games together (+2 points)
+- 🌙 Stay up late together (+2 points)
+
+**What Decreases Favorability:**
+- 😾 Looking at other cats' videos (-3 points)
+- ⏰ Ignoring the cat for too long (-2 points)
+- 🚫 Being too busy to interact
+
+**Relationship Levels:**
+1. **冷淡疏离** (-10 to -5): Cold and distant
+2. **有点生气** (-5 to 0): A bit angry  
+3. **普通朋友** (0 to 5): Normal friend
+4. **亲密伙伴** (5 to 10): Close companion
+5. **深爱依赖** (10 to 15): Deeply in love
+6. **灵魂伴侣** (15+): Soulmate
+
 ### 📁 Project Structure
 
 ```
@@ -124,6 +181,8 @@ ai_mac_pet/
 ├── pet_window.py           # Desktop pet GUI and interactions
 ├── screenshot_analyzer.py  # Screen capture and AI analysis
 ├── config.py              # Configuration settings
+├── favorability_system.py # Relationship tracking system
+├── prompt_templates.py    # Dynamic AI prompt generation
 ├── requirements.txt       # Python dependencies
 ├── assets/
 │   ├── cat_idle.png       # Cat sprite images
@@ -247,7 +306,8 @@ python main.py
 ### 🎮 使用方法
 
 #### 基本交互
-- **点击猫咪**: 触发即时屏幕分析
+- **左键点击猫咪**: 触发即时屏幕分析
+- **右键点击猫咪**: 打开活动统计窗口
 - **拖拽猫咪**: 将其移动到桌面的任何位置
 - **关闭窗口**: 退出应用程序
 
@@ -293,6 +353,8 @@ ai_mac_pet/
 ├── pet_window.py           # 桌面宠物GUI和交互
 ├── screenshot_analyzer.py  # 屏幕截图和AI分析
 ├── config.py              # 配置设置
+├── favorability_system.py # 关系追踪系统
+├── prompt_templates.py    # 动态AI提示生成
 ├── requirements.txt       # Python依赖
 ├── assets/
 │   ├── cat_idle.png       # 猫咪精灵图像
