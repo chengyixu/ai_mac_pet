@@ -25,9 +25,18 @@ def analysis_task_runner():
         return
 
     print("DEBUG: Analysis worker thread started.")
-    # Perform the analysis cycle; ensures a string is always returned
+    # Perform the analysis cycle; now returns a tuple (text, favorability_change)
     result = run_analysis_cycle()
-    print(f"DEBUG: Analysis thread finished. Raw result: '{result}'")
+    
+    # Handle both old string format and new tuple format for backward compatibility
+    if isinstance(result, tuple):
+        text, favorability_change = result
+        print(f"DEBUG: Analysis thread finished. Result: '{text}', Favorability change: {favorability_change}")
+    else:
+        # Fallback for old format
+        text = result
+        favorability_change = 0
+        print(f"DEBUG: Analysis thread finished. Raw result: '{text}'")
 
     # Check instance validity AGAIN before emitting signal (window might have closed)
     if not pet_app_instance:
@@ -35,17 +44,17 @@ def analysis_task_runner():
          return
 
     # Ensure result is a non-empty string before emitting
-    if not isinstance(result, str) or not result:
-         print(f"WARNING: Analysis returned invalid/empty result '{result}'. Using fallback.")
-         result = "喵？（分析好像失败了...）" # Fallback inside thread too
+    if not isinstance(text, str) or not text:
+         print(f"WARNING: Analysis returned invalid/empty result '{text}'. Using fallback.")
+         text = "喵？（分析好像失败了...）" # Fallback inside thread too
 
-    print(f"DEBUG: Emitting analysis_received signal from worker thread with result: '{result}'")
+    print(f"DEBUG: Emitting analysis_received signal from worker thread with result: '{text}'")
     # --- Emit the signal directly ---
     # Qt's signal/slot mechanism automatically handles marshalling the call
     # to the receiver's thread (the GUI thread in this case) because the
     # connection is cross-thread by default (AutoConnection -> QueuedConnection).
     try:
-        pet_app_instance.analysis_received.emit(result)
+        pet_app_instance.analysis_received.emit(text)
         print("DEBUG: analysis_received signal emitted successfully.")
     except Exception as e:
         print(f"ERROR: Failed to emit analysis_received signal: {e}")

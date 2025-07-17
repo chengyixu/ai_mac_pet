@@ -8,22 +8,28 @@ from PyQt6.QtCore import (Qt, QPoint, pyqtSignal, QTimer, QRect,
                          QMetaObject, Q_ARG, pyqtSlot)
 
 import config # Use settings from config.py
+from favorability_system import FavorabilitySystem  # Import favorability system
+from statistics_window import StatisticsWindow  # Import statistics window
 
-# Platform-specific imports for macOS 
-if platform.system() == 'Darwin':
-    try:
+# --- Platform Detection for macOS-specific features ---
+MACOS_OBJC_AVAILABLE = False
+NSUtilityWindowLevel = 4  # Default value
+
+try:
+    if sys.platform == "darwin":
         import objc
-        from ctypes import c_void_p  # Add this import
-        from Foundation import NSObject
-        from AppKit import NSApplication, NSApp, NSWindow, NSNormalWindowLevel, NSUtilityWindowLevel
+        from ctypes import c_void_p
         MACOS_OBJC_AVAILABLE = True
-        print("DEBUG: PyObjC available - macOS-specific window handling enabled")
-    except ImportError:
-        print("WARNING: PyObjC not available. macOS-specific window handling disabled.")
-        MACOS_OBJC_AVAILABLE = False
-else:
-    MACOS_OBJC_AVAILABLE = False
-    print("DEBUG: Not on macOS, skipping macOS-specific window handling")
+        
+        # Try to get the actual NSUtilityWindowLevel value
+        try:
+            AppKit = objc.cdll.LoadLibrary('/System/Library/Frameworks/AppKit.framework/AppKit')
+            NSUtilityWindowLevel = objc.objc_getClass('NSWindow').NSUtilityWindowLevel
+        except:
+            NSUtilityWindowLevel = 4  # Fallback to known value
+            
+except ImportError:
+    pass
 
 
 class SpeechBubble(QLabel):
@@ -116,6 +122,9 @@ class PetWindow(QWidget):
         self.analysis_in_progress = False # Flag to prevent rapid clicks
         self.click_press_pos = None # Store click position to differentiate click/drag
 
+        # Initialize favorability system BEFORE initUI
+        self.favorability = FavorabilitySystem()
+
         self.initUI()
 
         # Connect the signal to the slot (method)
@@ -133,7 +142,7 @@ class PetWindow(QWidget):
             print(f"DEBUG: Auto screenshot timer started with interval {config.AUTO_SCREENSHOT_INTERVAL_SECONDS} seconds")
         else:
             print("DEBUG: Auto screenshot feature is disabled in config")
-            
+        
         print("DEBUG: PetWindow __init__ finished.")
 
     def initUI(self):
@@ -150,10 +159,6 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         
-        # Main layout
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0,0,0,0) # No margins for the layout itself
-
         # Cat Image Label - Load, Scale, and Set
         self.cat_label = QLabel(self)
         original_pixmap = QPixmap("assets/cat_idle.png") # Make sure this path is correct
@@ -169,15 +174,56 @@ class PetWindow(QWidget):
                 Qt.TransformationMode.SmoothTransformation
             )
             self.cat_label.setPixmap(self.pixmap)
-            # Set window size based on the *scaled* pixmap
-            self.setFixedSize(self.pixmap.size())
-            print(f"DEBUG: Pet size set to {self.size()}")
+            print(f"DEBUG: Cat pixmap size: {self.pixmap.size()}")
 
-        self.layout.addWidget(self.cat_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.setLayout(self.layout)
-
-        # Speech Bubble (created as a top-level window)
+        # --- Favorability Indicator ---
+        self.favorability_label = QLabel(self)
+        self.favorability_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(255, 182, 193, 200); /* Light pink */
+                color: #d63384;
+                border-radius: 12px;
+                padding: 3px 6px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+        """)
+        self.favorability_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.favorability_label.setMaximumHeight(25)
+        # Let the label adjust width based on content
+        self.favorability_label.setMinimumWidth(100)
+        self.favorability_label.adjustSize()
+        self._update_favorability_display()
+        
+        # Main layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)  # Add small margins
+        layout.setSpacing(5)
+        
+        # Add favorability indicator at top
+        layout.addWidget(self.favorability_label, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        # Add cat image
+        layout.addWidget(self.cat_label, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        # Adjust window size to fit content
+        # We need slightly more height for the favorability indicator
+        # and ensure width is enough for the favorability text
+        if hasattr(self, 'pixmap') and not self.pixmap.isNull():
+            # Use the wider of cat image or minimum needed for favorability text
+            window_width = max(self.pixmap.width(), 150)  # At least 150px for Chinese text
+            window_height = self.pixmap.height() + 30  # Extra space for favorability indicator
+            self.setFixedSize(window_width, window_height)
+        else:
+            self.setFixedSize(max(config.PET_TARGET_WIDTH, 150), config.PET_TARGET_WIDTH + 30)
+        
+        print(f"DEBUG: Window size set to {self.size()}")
+        
+        # Speech Bubble (created as a top-level window, not added to layout)
         self.speech_bubble = SpeechBubble(None)  # Top-level window
+        
+        # Statistics Window (created on demand)
+        self.statistics_window = None
 
         # Set initial position: Bottom Right Corner
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -247,6 +293,9 @@ class PetWindow(QWidget):
         if not isinstance(text, str) or not text:
              print("WARNING: display_analysis_result received invalid text. Using fallback.")
              text = "喵~ （好像没什么可说的...）"
+        
+        # Update favorability display when showing results
+        self._update_favorability_display()
 
         # Show talking state briefly, then show speech bubble
         self._update_cat_state("talking")
@@ -272,8 +321,13 @@ class PetWindow(QWidget):
             self.is_dragging = False # Reset dragging flag on new press
             self.click_press_pos = event.pos() # Record local press position
             event.accept()
+        elif event.button() == Qt.MouseButton.RightButton:
+            # Handle right-click to show statistics
+            print("DEBUG: Right-click detected, showing statistics window")
+            self.show_statistics_window()
+            event.accept()
         else:
-             event.ignore() # Ignore right-clicks etc.
+             event.ignore() # Ignore other buttons
 
     def mouseMoveEvent(self, event: QMouseEvent):
         # Only process if left button is held down AND we recorded a press position
@@ -317,6 +371,26 @@ class PetWindow(QWidget):
             event.accept()
         else:
             event.ignore()
+    
+    def show_statistics_window(self):
+        """Show the statistics window with activity data."""
+        if self.statistics_window is None:
+            self.statistics_window = StatisticsWindow(self)
+        
+        # Center the statistics window relative to pet
+        pet_pos = self.pos()
+        stats_x = pet_pos.x() - 200  # Show to the left of the pet
+        stats_y = pet_pos.y() - 250  # Show above the pet
+        
+        # Ensure window stays on screen
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        stats_x = max(0, min(stats_x, screen_geometry.width() - 400))
+        stats_y = max(0, min(stats_y, screen_geometry.height() - 500))
+        
+        self.statistics_window.move(stats_x, stats_y)
+        self.statistics_window.show()
+        self.statistics_window.raise_()  # Bring to front
+        self.statistics_window.activateWindow()
 
     def closeEvent(self, event):
         """Ensure speech bubble is also closed/cleaned up."""
@@ -363,3 +437,48 @@ class PetWindow(QWidget):
         else: # idle
             self.cat_label.setPixmap(self.pixmap) # Reset to original scaled idle pixmap
             self.cat_label.setToolTip("")
+
+    def _update_favorability_display(self):
+        """Update the favorability indicator display."""
+        current_level = self.favorability.get_current_level()
+        level_desc = self.favorability.get_level_description()
+        
+        # Show hearts based on level
+        if current_level >= 10:
+            hearts = "♥♥♥♥♥"
+        elif current_level >= 5:
+            hearts = "♥♥♥♥"
+        elif current_level >= 0:
+            hearts = "♥♥♥"
+        elif current_level >= -5:
+            hearts = "♥♥"
+        else:
+            hearts = "♥"
+            
+        self.favorability_label.setText(f"{hearts} {level_desc}")
+        self.favorability_label.adjustSize()  # Ensure label resizes to fit text
+        
+        # Update color based on level
+        if current_level >= 10:
+            bg_color = "rgba(255, 105, 180, 200)"  # Hot pink
+            text_color = "#8b0051"
+        elif current_level >= 5:
+            bg_color = "rgba(255, 182, 193, 200)"  # Light pink
+            text_color = "#d63384"
+        elif current_level >= 0:
+            bg_color = "rgba(255, 218, 185, 200)"  # Peach
+            text_color = "#cc5500"
+        else:
+            bg_color = "rgba(200, 200, 200, 200)"  # Gray
+            text_color = "#555555"
+            
+        self.favorability_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg_color};
+                color: {text_color};
+                border-radius: 12px;
+                padding: 4px 8px;
+                font-size: 12px;
+                font-weight: bold;
+            }}
+        """)
