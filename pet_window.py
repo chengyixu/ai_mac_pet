@@ -248,6 +248,9 @@ class PetWindow(QWidget):
              print("WARNING: display_analysis_result received invalid text. Using fallback.")
              text = "喵~ （好像没什么可说的...）"
 
+        # Show talking state briefly, then show speech bubble
+        self._update_cat_state("talking")
+        
         # Call the speech bubble's method to show the message
         self.speech_bubble.show_message(
              text,
@@ -257,7 +260,9 @@ class PetWindow(QWidget):
 
         print("DEBUG: Resetting analysis_in_progress flag.")
         self.analysis_in_progress = False
-        self._update_cat_state("idle") # Reset to idle state visually
+        
+        # Reset to idle state after a short delay to show talking animation
+        QTimer.singleShot(1000, lambda: self._update_cat_state("idle"))
 
     # --- Dragging and Click Handling ---
     def mousePressEvent(self, event: QMouseEvent):
@@ -335,14 +340,26 @@ class PetWindow(QWidget):
     def _update_cat_state(self, state: str): # Actual GUI update runs in GUI thread
         """Private slot to perform the actual state update."""
         print(f"DEBUG: Updating cat state to: {state}")
-        # Add actual image loading/setting logic here if you have state images
-        # Example using tooltips as placeholders:
+        
+        # Load appropriate image based on state
         if state == "thinking":
-            # pixmap = QPixmap("assets/cat_thinking.png").scaledToWidth(...) etc.
-            # self.cat_label.setPixmap(pixmap)
+            thinking_pixmap = QPixmap("assets/cat_surprise.png")
+            if not thinking_pixmap.isNull():
+                scaled_pixmap = thinking_pixmap.scaledToWidth(
+                    config.PET_TARGET_WIDTH,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.cat_label.setPixmap(scaled_pixmap)
             self.cat_label.setToolTip("Hmm...")
-        elif state == "talking": # Might not be used directly if bubble shows immediately
-             self.cat_label.setToolTip("Meow!")
+        elif state == "talking":
+            talking_pixmap = QPixmap("assets/cat_talking.png")
+            if not talking_pixmap.isNull():
+                scaled_pixmap = talking_pixmap.scaledToWidth(
+                    config.PET_TARGET_WIDTH,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.cat_label.setPixmap(scaled_pixmap)
+            self.cat_label.setToolTip("Meow!")
         else: # idle
             self.cat_label.setPixmap(self.pixmap) # Reset to original scaled idle pixmap
             self.cat_label.setToolTip("")

@@ -1,0 +1,40 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+/tmp/
+*.tmp
+temp_cat_screenshot.png
+
+# Screenshots storage
+/tmp/cat_screenshots/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Binary files
+*.dmg
+*.zip
+*.exe
+*.app
+
+# Logs
+*.log 
